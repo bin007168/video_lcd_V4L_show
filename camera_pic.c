@@ -1,4 +1,4 @@
-/**
+/** this is bin v4l
 这个文件用来把摄像头图像显示在屏幕上
 
 操作步骤：
@@ -17,6 +17,7 @@ VIDIOC_S_STD,VIDIOC_S_FMT,struct v4l2_std_id,struct v4l2_format
 12. 关闭视频设备。close(fd);  
 */
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <linux/videodev2.h>
