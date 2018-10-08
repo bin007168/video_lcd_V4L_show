@@ -17,6 +17,7 @@ VIDIOC_S_STD,VIDIOC_S_FMT,struct v4l2_std_id,struct v4l2_format
 12. 关闭视频设备。close(fd);  
 */
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <linux/videodev2.h>
@@ -117,7 +118,7 @@ void show_camfmt(struct v4l2_format fmt)
 			printf("camera pixelformat: V4L2_PIX_FMT_YUYV\n");
 			break;
 		case V4L2_PIX_FMT_NV12:
-			printf("lcd pixelformat: V4L2_PIX_FMT_NV12 \n");
+			printf("camera pixelformat: V4L2_PIX_FMT_NV12 \n");
 			break;
 		default:
 			printf("the another pixelformat\n");
@@ -401,7 +402,7 @@ void yuv422_2_rgb()
             location=(height-k/(width*3))*(width*3);  
         }  
         bcopy(RGB,newBuf+location+(k%(width*3)),sizeof(RGB)); 
-        k+=6;	
+        k+=6;	 
 	}
 	return ;
 }
