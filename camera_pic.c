@@ -39,7 +39,7 @@ unsigned long bfSize;//位图文件的大小，以字节为单位
 unsigned short bfReserved1;//位图文件保留字，必须为0  
 unsigned short bfReserved2;//同上  
 unsigned long bfOffBits;//位图阵列的起始位置，以相对于位图文件   或者说是头的偏移量表示，以字节为单位  
-} BITMAPFILEHEADER;  
+} BITMAPFILEHEADER;  //bit mat file header 
 #pragma pack()  
 typedef struct BITMAPINFOHEADER//位图信息头类型的数据结构，用于说明位图的尺寸  
 {  
@@ -54,7 +54,7 @@ unsigned long biXPelsPerMeter;//位图目标设备水平分辨率，以每米像
 unsigned long biYPelsPerMeter;//位图目标设备垂直分辨率，以每米像素数为单位  
 unsigned long biClrUsed;//位图实际使用的颜色表中的颜色变址数  
 unsigned long biClrImportant;//位图显示过程中被认为重要颜色的变址数  
-} BITMAPINFOHEADER;  
+} BITMAPINFOHEADER;  //bitmap info header 
 
 void yuv422_2_rgb();
 
@@ -63,8 +63,10 @@ void yuv422_2_rgb();
 #define RGB_FILE	"rgb.bmp"
 
 static int fd = 0;
+static int pic_num = 0;
 static int width = 640;
 static int height = 480;
+FILE *video_file = NULL;
 static struct v4l2_fmtdesc fmtdesc;
 struct videobuffer{
 	unsigned int length;
@@ -98,6 +100,29 @@ void create_bmp_header()
 	bih.biSize = 40;//sizeof(bih);  
 	bih.biXPelsPerMeter = 0x00000ec4;  
 	bih.biYPelsPerMeter=0x00000ec4;  
+}
+
+void show_camfmt(struct v4l2_format fmt)
+{
+	printf("camera width : %d \n", fmt.fmt.pix.width);
+	printf("camera height: %d \n", fmt.fmt.pix.height);
+
+//	printf("switch fmt is %s\n",fmt.fmt.pix.pixelformat);
+	switch(fmt.fmt.pix.pixelformat)
+	{
+		case V4L2_PIX_FMT_JPEG:
+			printf("camera pixelformat: V4L2_PIX_FMT_JPEG\n");
+			break;
+		case V4L2_PIX_FMT_YUYV:
+			printf("camera pixelformat: V4L2_PIX_FMT_YUYV\n");
+			break;
+		case V4L2_PIX_FMT_NV12:
+			printf("lcd pixelformat: V4L2_PIX_FMT_NV12 \n");
+			break;
+		default:
+			printf("the another pixelformat\n");
+		
+	}
 }
 
 
@@ -143,8 +168,16 @@ void enumfmtCamera()
 /* 4、设置视频格式 VIDIOC_S_FMT struct v4l2_format */
 int setfmtCamera()
 {
+	printf("-----------------VIDIOC_G_FMT----------------------\n");
 	int ret;
 	struct v4l2_format format;
+	format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	ioctl(fd, VIDIOC_G_FMT, &format); //读取当前驱动的频捕获格式 
+	printf("【4】the format of camera size is:\n");
+	show_camfmt(format);
+	
+	// 配置摄像头的采集格式
+	memset(&format,0,sizeof(format));
 	format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	format.fmt.pix.width = width;
 	format.fmt.pix.height = height;
@@ -163,10 +196,8 @@ int setfmtCamera()
 		printf("VIDIOC_G_FMT fail\n");
 		return -1;
 	}
-	printf("-----------------VIDIOC_G_FMT----------------------\n");
-	printf("width:%d   \nheight:%d   \ntype:%x   pixelformat:%c%c%c%c\n",format.fmt.pix.width,format.fmt.pix.height,
-		format.type,format.fmt.pix.pixelformat&0xff,(format.fmt.pix.pixelformat>>8)&0xff,(format.fmt.pix.pixelformat>>16)&0xff,
-		(format.fmt.pix.pixelformat>>24)&0xff);
+	printf("type:%x   pixelformat:%c%c%c%c\n",format.type,format.fmt.pix.pixelformat&0xff,
+	(format.fmt.pix.pixelformat>>8)&0xff,(format.fmt.pix.pixelformat>>16)&0xff,(format.fmt.pix.pixelformat>>24)&0xff);
 	return 0;
 }
 
@@ -188,7 +219,7 @@ int initmmap()
 	//v4l2_buffer 查询buffer地址并进行地址映射
 	printf("----------------mmap----------------\n");
 	for(i =0; i < reqbuf.count; i++){
-		struct v4l2_buffer buf;
+//		struct v4l2_buffer buf;
 		memset(&buf, 0, sizeof(buf));
 		buf.index = i;
 		buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -208,7 +239,7 @@ int initmmap()
 }
 
 
-/* 6、开始采集视频数据   
+/* 6、开始采集视频数据   先采集视频，之后才有判断缓冲区的过程
  * 将缓冲区如队列 VIDIOC_QBUF  struct v4l2_buffer
  * 开始流传输 VIDIOC_STREAMON
  */
@@ -223,7 +254,7 @@ static int startcap()
 		buf.index = i;
 		ret = ioctl(fd, VIDIOC_QBUF, &buf);
 		if(0 != ret){
-			perror("VIDIOC_QBUF fail.\n");
+			perror("VIDIOC_QBUF fail.123\n");
 			return -1;
 		}
 	}
@@ -240,32 +271,41 @@ static int startcap()
 int readfram()
 {
 	struct pollfd pollfd;
-	int ret,i;
+	int ret;
 	char filename[50];
+//	char videoname[30]={"video.yuv"};
 	while(1)
 	{
 		memset(&pollfd, 0, sizeof(pollfd));
 		pollfd.fd = fd;
-		pollfd.events = POLLIN;
+    	pollfd.events = POLLIN;
 		ret = poll(&pollfd, 1, 800);
-		if(-1 == ret){
+		if(ret == -1){
 			perror("VIDIOC_QBUF fail.\n");
 			return -1;
-		}else if(0 == ret){
+		}else if(ret == 0){
 			printf("poll time out\n");
 			continue;
 		}
-		//printf("-------------poll success---------------\n");
+		//printf("-------------poll success---------------\n");  
 
-	if(pollfd.revents & POLLIN){
+		if(pollfd.revents & POLLIN){
 		memset(&buf, 0, sizeof(buf));
 		buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		buf.memory = V4L2_MEMORY_MMAP;
 		ret = ioctl(fd, VIDIOC_DQBUF, &buf);
 		if(0 != ret){
-			perror("VIDIOC_QBUF fail.\n");
+			perror("VIDIOC_QBUF fail.456\n");
 			return -1;
-		}
+		}  
+		
+		//直接保存yuyv数据的视频
+/*		ret = fwrite((char*)framebuf[buf.index].start, 1, buf.length, video_file);
+		if(ret == 0){
+			printf("fwrite yuyv video failed\n");
+			return -1;
+		}     */
+		
 
 		// RGB格式数据
 		starter = (unsigned char*)framebuf[buf.index].start;
@@ -273,17 +313,23 @@ int readfram()
 		newBuf = (unsigned char*)calloc((unsigned int)(framebuf[buf.index].length*3/2),sizeof(unsigned char));
 		yuv422_2_rgb();
 		fb_drawbmp(height, width, newBuf);
-		//fb_drawback(480, 800, 0x00f0);
+		
+		
+//		fb_drawback(480, 800, 0x00f0);
 		/* 得到一张bmp图片 */
 /*
 		create_bmp_header();
-		sprintf(filename,"rgb%d.bmp",i);
+		sprintf(filename,"rgb%d.bmp",pic_num);
 		FILE *file1 = fopen(filename, "wb");
 		fwrite(&bfh,sizeof(bfh),1,file1);  
 		fwrite(&bih,sizeof(bih),1,file1);
 		fwrite(newBuf, 1, buf.length*3/2, file1);
 		fclose(file1);
-*/		
+		pic_num++;
+		if(pic_num > 100)
+			pic_num = 0;  */
+		
+		
 		ret = ioctl(fd, VIDIOC_QBUF, &buf);
 		// 释放内存
 		free(newBuf);
@@ -302,7 +348,7 @@ static void closeCamera()
 	type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	ret = ioctl(fd,VIDIOC_STREAMOFF, &type);
 	if(0 != ret){
-		perror("VIDIOC_QBUF fail.\n");
+		perror("VIDIOC_QBUF fail.123\n");
 		return ;
 	}
 	for(i = 0; i < videocount; i++){
@@ -384,7 +430,11 @@ int main(int argc, char* argv[])
 	setfmtCamera();
 	initmmap();
 	startcap();
+	
+//	video_file = fopen("video.yuv", "wa+");
 	readfram();
+//	fclose(video_file);
+	
 	closeCamera();
 	closefb();
 	return 0;
