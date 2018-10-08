@@ -1,5 +1,5 @@
-/** this is bin v4l
-这个文件用来把摄像头图像显示在屏幕上  继续测试行不行
+/** 
+这个文件用来把摄像头图像显示在屏幕上 test finished 17:49
 
 操作步骤：
 1. 打开设备文件。 int fd=open(”/dev/video0″,O_RDWR);  
@@ -118,7 +118,7 @@ void show_camfmt(struct v4l2_format fmt)
 			printf("camera pixelformat: V4L2_PIX_FMT_YUYV\n");
 			break;
 		case V4L2_PIX_FMT_NV12:
-			printf("lcd pixelformat: V4L2_PIX_FMT_NV12 \n");
+			printf("camera pixelformat: V4L2_PIX_FMT_NV12 \n");
 			break;
 		default:
 			printf("the another pixelformat\n");
@@ -402,7 +402,7 @@ void yuv422_2_rgb()
             location=(height-k/(width*3))*(width*3);  
         }  
         bcopy(RGB,newBuf+location+(k%(width*3)),sizeof(RGB)); 
-        k+=6;	
+        k+=6;	 
 	}
 	return ;
 }
