@@ -1,4 +1,4 @@
-/**
+/**  in the dev_branch of this test
 这个文件用来把摄像头图像显示在屏幕上
 
 操作步骤：
