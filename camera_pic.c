@@ -166,14 +166,48 @@ void enumfmtCamera()
 	}
 }
 
+/* 3.1、设置获取图片大小 ？？*/
+void set_v4l2_crop()
+{
+	struct v4l2_crop crop;
+    crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	if (ioctl(fd, VIDIOC_G_CROP, &crop) < 0) {
+		printf("VIDIOC_G_CROP failed\n");
+	}	
+	struct v4l2_cropcap cropcap;
+    memset(&cropcap,0,sizeof(cropcap));
+	cropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	if(ioctl(fd,VIDIOC_CROPCAP,&cropcap) < 0){
+		printf("camera not suppose cropcap.\n");
+	}
+	crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	crop.c.width = 1280;
+	crop.c.height = 720;
+	crop.c.top = 0;
+	crop.c.left = 0;
+	if (ioctl(fd, VIDIOC_S_CROP, &crop) < 0) {
+		printf("VIDIOC_S_CROP failed\n");
+		//return -1;
+	}
+}
+
 /* 4、设置视频格式 VIDIOC_S_FMT struct v4l2_format */
 int setfmtCamera()
 {
+//	set_v4l2_crop();
 	printf("-----------------VIDIOC_G_FMT----------------------\n");
 	int ret;
 	struct v4l2_format format;
 	format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	ioctl(fd, VIDIOC_G_FMT, &format); //读取当前驱动的频捕获格式 
+	if (ioctl(fd, VIDIOC_G_FMT, &format) < 0) //读取当前驱动的频捕获格式 
+	{
+		printf("ioctl(fd, VIDIOC_G_FMT, &format) failed\n");
+		return -1;
+	}else{
+		printf("ioctl(fd, VIDIOC_G_FMT, &format) success\n");
+	}
+	printf("Image size = %d\n",format.fmt.pix.sizeimage);
+	
 	printf("【4】the format of camera size is:\n");
 	show_camfmt(format);
 	
@@ -197,6 +231,7 @@ int setfmtCamera()
 		printf("VIDIOC_G_FMT fail\n");
 		return -1;
 	}
+	show_camfmt(format);
 	printf("type:%x   pixelformat:%c%c%c%c\n",format.type,format.fmt.pix.pixelformat&0xff,
 	(format.fmt.pix.pixelformat>>8)&0xff,(format.fmt.pix.pixelformat>>16)&0xff,(format.fmt.pix.pixelformat>>24)&0xff);
 	return 0;
@@ -428,6 +463,7 @@ int main(int argc, char* argv[])
 	init_fbmmap();
 	capabilityCamera();
 	enumfmtCamera();
+//	set_v4l2_crop();   //设置摄像头缩放大小  比如可以将摄像头设置为1920*1080 改为 1280*720
 	setfmtCamera();
 	initmmap();
 	startcap();
